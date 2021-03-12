@@ -13,33 +13,24 @@ def translate_speech_to_speech():
     speech_config = speechsdk.SpeechConfig(
         subscription=speech_key, region=service_region)
 
-    # Sets the synthesis output voice name.
-    # Replace with the languages of your choice, from list found here: https://aka.ms/speech/tts-languages
-    speech_config.speech_synthesis_voice_name = "de-DE-Hedda"
-
     # Creates a speech synthesizer using the configured voice for audio output.
     speech_synthesizer = speechsdk.SpeechSynthesizer(
         speech_config=speech_config)
 
     # Sets source and target languages.
-    # In this example, the service will translate a US English spoken input, to a German language spoken output
+    # In this example, the service will translate a US English spoken input, to French and Indonesian language spoken output
     # Replace with the languages of your choice, from list found here: https://aka.ms/speech/sttt-languages
     fromLanguage = 'en-US'
-    toLanguage = 'de'
     translation_config.speech_recognition_language = fromLanguage
-    translation_config.add_target_language(toLanguage)
+
+    # Add more than one language to the collection.
+    # using the add_target_language() method
+    translation_config.add_target_language("fr")
+    translation_config.add_target_language("id-ID")
 
     # Creates a translation recognizer using and audio file as input.
     recognizer = speechsdk.translation.TranslationRecognizer(
         translation_config=translation_config)
-
-    # Prepare to handle the synthesized audio data.
-    def synthesis_callback(evt):
-        size = len(evt.result.audio)
-        print('AUDIO SYNTHESIZED: {} byte(s) {}'.format(
-            size, '(COMPLETED)' if size == 0 else ''))
-
-    recognizer.synthesizing.connect(synthesis_callback)
 
     # Starts translation, and returns after a single utterance is recognized. The end of a
     # single utterance is determined by listening for silence at the end or until a maximum of 15
@@ -50,16 +41,45 @@ def translate_speech_to_speech():
     print("Say something...")
     result = recognizer.recognize_once()
 
-    # Check the result
+# Check the result
     if result.reason == speechsdk.ResultReason.TranslatedSpeech:
+        # Output the text for the recognized speech input
         print("RECOGNIZED '{}': {}".format(fromLanguage, result.text))
-        print("TRANSLATED into {}: {}".format(
-            toLanguage, result.translations['de']))
 
-        # Synthesizes the received text to speech.
-        # The synthesized speech is expected to be heard on the speaker with this line executed.
-        result = speech_synthesizer.speak_text_async(
-            result.translations['de']).get()
+        # Loop through the returned translation results
+        for key in result.translations:
+
+            # Using the Key and Value components of the returned dictionary for the translated results
+            # The first portion gets the key (language code) while the second gets the Value
+            # which is the translated text for the language specified
+            # Output the language and then the translated text
+            print("TRANSLATED into {}: {}".format(
+                key, result.translations[key]))
+
+            # If the language code is 'fr' for French, then use the French voice for Julie
+            # If you change the languages in the 'AddTargetLanguage' above, ensure you modify this if statement as well
+            if key == "fr":
+                speech_config.speech_synthesis_voice_name = "fr-FR-Julie-Apollo"
+
+                # Update the speech synthesizer to use the proper voice
+                speech_synthesizer = speechsdk.SpeechSynthesizer(
+                    speech_config=speech_config)
+
+                # Use the proper voice, from the speech synthesizer configuration, to narrate the translated result
+                # in the native speaker voice.
+                speech_synthesizer.speak_text_async(
+                    result.translations[key]).get()
+            else:  # Otherwise, use the voice for the Indonesian translation
+                speech_config.speech_synthesis_voice_name = "id-ID-Andika"
+
+                # Update the speech synthesizer to use the proper voice
+                speech_synthesizer = speechsdk.SpeechSynthesizer(
+                    speech_config=speech_config)
+
+                # Use the proper voice, from the speech synthesizer configuration, to narrate the translated result
+                # in the native speaker voice.
+                speech_synthesizer.speak_text_async(
+                    result.translations[key]).get()
 
     elif result.reason == speechsdk.ResultReason.RecognizedSpeech:
         print("RECOGNIZED: {} (text could not be translated)".format(result.text))
